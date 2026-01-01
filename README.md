@@ -1,8 +1,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-OpenStack-red?style=for-the-badge&logo=openstack" alt="OpenStack"/>
-  <img src="https://img.shields.io/badge/AI-OpenAI%20GPT--4-412991?style=for-the-badge&logo=openai" alt="OpenAI"/>
   <img src="https://img.shields.io/badge/IaC-Terraform-7B42BC?style=for-the-badge&logo=terraform" alt="Terraform"/>
   <img src="https://img.shields.io/badge/Automation-Ansible-EE0000?style=for-the-badge&logo=ansible" alt="Ansible"/>
+  <img src="https://img.shields.io/badge/Monitoring-Prometheus-E6522C?style=for-the-badge&logo=prometheus" alt="Prometheus"/>
 </p>
 
 <h1 align="center">🛡️ SecOps Platform</h1>
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <em>Automated security scanning • AI-powered remediation • Self-healing infrastructure</em>
+  <em>Automated security scanning • Rule-based remediation • Self-healing infrastructure</em>
 </p>
 
 <p align="center">
@@ -30,8 +30,8 @@
 **SecOps Platform** is a comprehensive security automation solution designed for OpenStack cloud environments. It provides:
 
 - 🔍 **Automated Security Scanning**: Continuous detection of misconfigurations across your OpenStack infrastructure
-- 🤖 **AI-Powered Remediation**: Intelligent suggestions powered by OpenAI GPT-4
-- ⚡ **Automated Response**: Execute approved remediations with YAML-based runbooks
+- 🛠️ **Rule-Based Remediation**: Intelligent remediation engine with YAML-based runbooks
+- ⚡ **Automated Response**: Execute approved remediations automatically
 - 📊 **Full Observability**: Complete monitoring stack with Prometheus, Grafana, and Loki
 
 ### Why SecOps?
@@ -39,7 +39,7 @@
 | Challenge | SecOps Solution |
 |-----------|-----------------|
 | Manual security audits are slow | Automated scans every 5 minutes |
-| Remediation requires expertise | AI generates step-by-step fixes |
+| Remediation requires expertise | Rule-based engine with predefined runbooks |
 | No visibility into security posture | Real-time dashboards and metrics |
 | Scattered logs and alerts | Centralized logging and alerting |
 
@@ -89,12 +89,12 @@
 </tr>
 </table>
 
-### 🤖 AI-Powered Remediation
+### 🛠️ Automated Remediation
 
-- **Smart Suggestions**: GPT-4 generates detailed remediation steps
-- **Contextual Analysis**: Understands your infrastructure context
+- **Runbook Catalog**: Predefined remediation actions in YAML format
+- **Security Group Fixes**: Automatically restrict open ports (SSH, RDP, DB)
 - **Approval Workflow**: Human-in-the-loop for critical changes
-- **Runbook Integration**: Execute fixes via YAML-based runbooks
+- **Execution Engine**: Execute fixes via OpenStack SDK and Ansible
 
 ### 📊 Observability Stack
 
@@ -124,7 +124,7 @@
 │  │  │                 │  │                  │  │              │ │ │
 │  │  │  • Grafana      │  │  • REST API      │  │  • Demo      │ │ │
 │  │  │  • Prometheus   │  │  • Scanners      │  │    Misconfig │ │ │
-│  │  │  • Loki         │  │  • AI Service    │  │              │ │ │
+│  │  │  • Loki         │  │  • Remediation   │  │              │ │ │
 │  │  │  • AlertManager │  │  • Scheduler     │  │              │ │ │
 │  │  │                 │  │                  │  │              │ │ │
 │  │  │  📍 10.10.50.60 │  │  📍 10.10.50.163 │  │ 📍10.10.50.233│ │ │
@@ -156,14 +156,14 @@
                                    │  └────────────┬───────────────────┘  │
                                    │               │                       │
                                    │  ┌────────────▼───────────────────┐  │
-                                   │  │  AI Service (OpenAI GPT-4)     │  │
-                                   │  │  → Generate Remediation        │  │
+                                   │  │  Remediation Engine            │  │
+                                   │  │  → Execute Runbooks            │  │
                                    │  └────────────┬───────────────────┘  │
                                    │               │                       │
                                    │  ┌────────────▼───────────────────┐  │
                                    │  │  SQLite Database               │  │
                                    │  │  • Findings                    │  │
-                                   │  │  • Suggestions                 │  │
+                                   │  │  • Remediations                │  │
                                    │  │  • Remediation Runs            │  │
                                    │  └────────────────────────────────┘  │
                                    └───────────────┬───────────────────────┘
@@ -192,7 +192,6 @@
 | **Infrastructure** | Terraform, OpenStack |
 | **Configuration** | Ansible |
 | **Backend** | Python 3.8+, FastAPI, OpenStack SDK |
-| **AI** | OpenAI GPT-4 |
 | **Database** | SQLite |
 | **Monitoring** | Prometheus, Grafana, Loki, Promtail |
 | **Containers** | Docker, Docker Compose |
@@ -226,7 +225,6 @@
 
 ### Optional
 
-- 🔑 **OpenAI API Key** - For AI-powered suggestions
 - 🌐 **Domain name** - For production HTTPS access
 
 ---
@@ -338,10 +336,6 @@ secops-cli findings show <id>         # View finding details
 
 secops-cli scan                       # Trigger manual scan
 
-secops-cli suggestions generate <id>  # Generate AI suggestion
-secops-cli suggestions list           # List all suggestions
-secops-cli suggestions approve <id>   # Approve a suggestion
-
 secops-cli remediate run <id>         # Execute remediation
 secops-cli remediate show <id>        # View remediation status
 
@@ -358,7 +352,6 @@ ssh -L 8000:10.10.50.237:8000 ubuntu@<gateway-floating-ip>
 curl http://localhost:8000/api/findings      # List findings
 curl http://localhost:8000/api/services      # List services
 curl -X POST http://localhost:8000/api/scan  # Trigger scan
-curl http://localhost:8000/api/suggestions   # List suggestions
 ```
 
 ### Typical Workflow
@@ -366,10 +359,9 @@ curl http://localhost:8000/api/suggestions   # List suggestions
 ```mermaid
 graph LR
     A[🔍 Scan] --> B[📋 View Findings]
-    B --> C[🤖 Generate AI Suggestion]
-    C --> D[✅ Review & Approve]
-    D --> E[⚡ Execute Remediation]
-    E --> F[🔄 Verify]
+    B --> C[✅ Review Finding]
+    C --> D[⚡ Execute Remediation]
+    D --> E[🔄 Verify]
 ```
 
 ```bash
@@ -379,19 +371,13 @@ secops-cli scan
 # 2. View high severity findings
 secops-cli findings list --severity HIGH
 
-# 3. Generate AI suggestion for a finding
-secops-cli suggestions generate <finding-id>
+# 3. View finding details
+secops-cli findings show <finding-id>
 
-# 4. Review the suggestion
-secops-cli suggestions show <suggestion-id>
-
-# 5. Approve if acceptable
-secops-cli suggestions approve <suggestion-id>
-
-# 6. Execute remediation
+# 4. Execute remediation
 secops-cli remediate run <finding-id>
 
-# 7. Verify the result
+# 5. Verify the result
 secops-cli remediate show <run-id>
 ```
 
@@ -525,7 +511,6 @@ Common issues:
 - [Prometheus Documentation](https://prometheus.io/docs/)
 - [Loki Documentation](https://grafana.com/docs/loki/latest/)
 - [OpenStack SDK](https://docs.openstack.org/openstacksdk/)
-- [OpenAI API](https://platform.openai.com/docs/)
 
 ---
 
@@ -612,7 +597,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Special thanks to:
 - 🌐 OpenStack community
 - 🏗️ Terraform and Ansible communities
-- 🤖 OpenAI for GPT-4 API
 - 📊 Prometheus, Grafana, and Loki projects
 
 ---

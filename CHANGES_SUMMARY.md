@@ -211,7 +211,7 @@ git commit -m "Initial commit: SecOps SOAR Platform
 Features:
 - Security Orchestration, Automation, and Response (SOAR)
 - Automated scanning for OpenStack misconfigurations
-- AI-powered remediation suggestions (OpenAI GPT-4)
+- Rule-based remediation with runbook catalog
 - Automated remediation with approval workflow
 - Full observability stack (Prometheus, Grafana, Loki)
 - Infrastructure as Code (Terraform + Ansible)

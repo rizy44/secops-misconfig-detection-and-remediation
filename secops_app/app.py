@@ -12,7 +12,7 @@ import json
 from scanners.api_endpoint_scanner import APIEndpointScanner
 from scanners.openstack_exposure_scanner import scan_floating_ips, scan_port_security
 from scanners.os_baseline_scanner import scan_os_baseline
-from services.openai_service import OpenAIService
+# OpenAI service removed - using rule-based remediation
 from services.normalize import normalize_finding
 from services.remediation_engine import RemediationEngine
 
@@ -29,11 +29,7 @@ logging.getLogger().addHandler(fh)   #  add vào logger "secops"
 DB_PATH = os.environ.get("SECOPS_DB", "/data/secops/findings.db")
 SCAN_INTERVAL_SEC = int(os.environ.get("SCAN_INTERVAL_SEC", "60"))
 
-# Initialize OpenAI service
-openai_service = OpenAIService(
-    api_key=config.OPENAI_API_KEY,
-    model=config.OPENAI_MODEL
-)
+# Note: OpenAI service has been removed - using rule-based remediation engine only
 
 # Initialize Remediation Engine
 catalog_path = os.path.join(os.path.dirname(__file__), "remediation", "catalog.yml")
@@ -527,146 +523,8 @@ def trigger_scan():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/suggestions/{finding_id}")
-def generate_suggestion(finding_id: int):
-    """Generate OpenAI suggestion for a finding"""
-    if not openai_service.is_available():
-        raise HTTPException(status_code=503, detail="OpenAI service not configured")
-    
-    # Get finding
-    with sqlite3.connect(DB_PATH) as con:
-        con.row_factory = sqlite3.Row
-        cur = con.execute("SELECT * FROM findings WHERE id = ?", (finding_id,))
-        row = cur.fetchone()
-        
-        if not row:
-            raise HTTPException(status_code=404, detail="Finding not found")
-        
-        finding = dict(row)
-        # Normalize finding to get canonical type
-        finding = normalize_finding(finding)
-    
-    # Generate suggestion
-    suggestion_text = openai_service.generate_suggestion(finding)
-    
-    if not suggestion_text:
-        raise HTTPException(status_code=500, detail="Failed to generate suggestion")
-    
-    # Save suggestion
-    with sqlite3.connect(DB_PATH) as con:
-        cur = con.execute(
-            """INSERT INTO suggestions(finding_id, suggestion_text, status, created_at, updated_at)
-               VALUES (?, ?, 'pending', ?, ?)""",
-            (finding_id, suggestion_text, int(time.time()), int(time.time()))
-        )
-        suggestion_id = cur.lastrowid
-        con.commit()
-    
-    return {
-        "id": suggestion_id,
-        "finding_id": finding_id,
-        "suggestion_text": suggestion_text,
-        "status": "pending"
-    }
-
-
-@app.get("/api/suggestions")
-def list_suggestions(finding_id: Optional[int] = None, status: Optional[str] = None):
-    """List suggestions with optional filters"""
-    with sqlite3.connect(DB_PATH) as con:
-        con.row_factory = sqlite3.Row
-        
-        query = "SELECT * FROM suggestions WHERE 1=1"
-        params = []
-        
-        if finding_id:
-            query += " AND finding_id = ?"
-            params.append(finding_id)
-        
-        if status:
-            query += " AND status = ?"
-            params.append(status)
-        
-        query += " ORDER BY id DESC"
-        
-        cur = con.execute(query, params)
-        rows = cur.fetchall()
-    
-    return [dict(row) for row in rows]
-
-
-@app.get("/api/suggestions/{suggestion_id}")
-def get_suggestion(suggestion_id: int):
-    """Get detailed suggestion by ID"""
-    with sqlite3.connect(DB_PATH) as con:
-        con.row_factory = sqlite3.Row
-        cur = con.execute("SELECT * FROM suggestions WHERE id = ?", (suggestion_id,))
-        row = cur.fetchone()
-        
-        if not row:
-            raise HTTPException(status_code=404, detail="Suggestion not found")
-        
-        return dict(row)
-
-
-@app.post("/api/suggestions/{suggestion_id}/approve")
-def approve_suggestion(suggestion_id: int):
-    """Approve a suggestion"""
-    with sqlite3.connect(DB_PATH) as con:
-        # Check if suggestion exists
-        cur = con.execute("SELECT finding_id FROM suggestions WHERE id = ?", (suggestion_id,))
-        row = cur.fetchone()
-        
-        if not row:
-            raise HTTPException(status_code=404, detail="Suggestion not found")
-        
-        finding_id = row[0]
-        
-        # Update suggestion status
-        con.execute(
-            "UPDATE suggestions SET status = 'approved', updated_at = ? WHERE id = ?",
-            (int(time.time()), suggestion_id)
-        )
-        
-        # Update finding status
-        con.execute(
-            "UPDATE findings SET status = 'approved' WHERE id = ?",
-            (finding_id,)
-        )
-        
-        con.commit()
-    
-    return {"status": "success", "message": "Suggestion approved"}
-
-
-@app.post("/api/suggestions/{suggestion_id}/reject")
-def reject_suggestion(suggestion_id: int):
-    """Reject a suggestion"""
-    with sqlite3.connect(DB_PATH) as con:
-        # Check if suggestion exists
-        cur = con.execute("SELECT finding_id FROM suggestions WHERE id = ?", (suggestion_id,))
-        row = cur.fetchone()
-        
-        if not row:
-            raise HTTPException(status_code=404, detail="Suggestion not found")
-        
-        finding_id = row[0]
-        
-        # Update suggestion status
-        con.execute(
-            "UPDATE suggestions SET status = 'rejected', updated_at = ? WHERE id = ?",
-            (int(time.time()), suggestion_id)
-        )
-        
-        # Update finding status
-        con.execute(
-            "UPDATE findings SET status = 'rejected' WHERE id = ?",
-            (finding_id,)
-        )
-        
-        con.commit()
-    
-    return {"status": "success", "message": "Suggestion rejected"}
+# Note: Suggestions API endpoints have been removed as OpenAI integration is no longer used
+# The system now uses rule-based remediation via the remediate endpoint below
 
 
 @app.post("/api/remediate/{finding_id}")
@@ -856,16 +714,11 @@ async def root():
         "endpoints": {
             "findings": {
                 "list": "GET /api/findings?limit=50&severity=HIGH&service=Compute&status=new",
+                "get": "GET /api/findings/{finding_id}",
                 "create": "POST /api/scan"
             },
             "services": {
                 "list": "GET /api/services"
-            },
-            "suggestions": {
-                "list": "GET /api/suggestions?finding_id=123&status=pending",
-                "generate": "POST /api/suggestions/{finding_id}",
-                "approve": "POST /api/suggestions/{suggestion_id}/approve",
-                "reject": "POST /api/suggestions/{suggestion_id}/reject"
             },
             "remediation": {
                 "remediate": "POST /api/remediate/{finding_id}?force=false",
@@ -876,6 +729,7 @@ async def root():
             "scan": "POST /api/scan"
         }
     }
+
 
 
 @app.on_event("startup")

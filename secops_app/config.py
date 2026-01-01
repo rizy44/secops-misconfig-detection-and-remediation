@@ -1,9 +1,5 @@
 import os
 
-# OpenAI Configuration
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4")
-
 # OpenStack API Endpoints to scan
 # Format: {"service_name": "endpoint_url"}
 OPENSTACK_API_ENDPOINTS = {
@@ -70,5 +66,3 @@ SENSITIVE_PORTS = [
 # OS baseline scanning
 OS_SCAN_ENABLED = os.environ.get("OS_SCAN_ENABLED", "false").lower() == "true"
 OS_SCAN_TIMEOUT = int(os.environ.get("OS_SCAN_TIMEOUT", "10"))  # seconds
-
-

@@ -151,26 +151,8 @@ ansible-playbook -i inventory.ini \
   05-gateway-routing.yml
 ```
 
-## Step 6: Configure OpenAI (Optional)
+## Step 6: Access the System
 
-If you want AI-powered remediation suggestions:
-
-```bash
-# Set your OpenAI API key
-export OPENAI_API_KEY="sk-your-api-key-here"
-
-# SSH into secops-app VM
-ssh -J ubuntu@<gateway-floating-ip> ubuntu@<secops-app-ip>
-
-# Add to openstack.env
-echo "OPENAI_API_KEY=$OPENAI_API_KEY" >> /opt/secops/secops_app/openstack.env
-
-# Restart container
-cd /opt/secops/secops_app
-docker-compose restart
-```
-
-## Step 7: Access the System
 
 ### Grafana Dashboard
 
@@ -202,8 +184,9 @@ docker exec -it secops-secops-app-1 bash
 # Use CLI
 secops-cli findings list
 secops-cli scan
-secops-cli suggestions list
+secops-cli remediate run <finding-id> --force
 ```
+
 
 ### SecOps API
 

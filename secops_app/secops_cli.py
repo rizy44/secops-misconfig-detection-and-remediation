@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 SecOps CLI Tool
-Query findings, generate suggestions, and manage SecOps API
+Query findings and manage SecOps API
 """
 
 import sys
@@ -129,106 +129,6 @@ def trigger_scan(api_url: str):
         sys.exit(1)
 
 
-def generate_suggestion(api_url: str, finding_id: int, format: str):
-    """Generate AI suggestion for a finding"""
-    url = f"{api_url}/api/suggestions/{finding_id}"
-    
-    try:
-        print(f"Generating suggestion for finding {finding_id}...")
-        response = requests.post(url)
-        
-        if response.status_code == 503:
-            print("Error: OpenAI service not configured")
-            sys.exit(1)
-        
-        response.raise_for_status()
-        suggestion = response.json()
-        
-        if format == "json":
-            print(json.dumps(suggestion, indent=2))
-        else:
-            print(f"\n{'='*60}")
-            print(f"Suggestion ID: {suggestion.get('id')}")
-            print(f"Finding ID: {suggestion.get('finding_id')}")
-            print(f"Status: {suggestion.get('status')}")
-            print(f"\n{'='*60}")
-            print(suggestion.get("suggestion_text", ""))
-            print(f"{'='*60}\n")
-    
-    except requests.exceptions.RequestException as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-
-
-def list_suggestions(api_url: str, finding_id: Optional[int], status: Optional[str], format: str):
-    """List suggestions"""
-    url = f"{api_url}/api/suggestions"
-    params = {}
-    
-    if finding_id:
-        params["finding_id"] = finding_id
-    if status:
-        params["status"] = status
-    
-    try:
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        suggestions = response.json()
-        
-        if format == "json":
-            print(json.dumps(suggestions, indent=2))
-        else:
-            if not suggestions:
-                print("No suggestions found")
-                return
-            
-            formatted = []
-            for s in suggestions:
-                formatted.append({
-                    "ID": s.get("id"),
-                    "Finding ID": s.get("finding_id"),
-                    "Status": s.get("status"),
-                    "Preview": (s.get("suggestion_text", "")[:50] + "...") if len(s.get("suggestion_text", "")) > 50 else s.get("suggestion_text", "")
-                })
-            
-            print_table(formatted)
-            print(f"\nTotal: {len(suggestions)} suggestions")
-    
-    except requests.exceptions.RequestException as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-
-
-def approve_suggestion(api_url: str, suggestion_id: int):
-    """Approve a suggestion"""
-    url = f"{api_url}/api/suggestions/{suggestion_id}/approve"
-    
-    try:
-        response = requests.post(url)
-        response.raise_for_status()
-        result = response.json()
-        print(f"✓ {result.get('message', 'Suggestion approved')}")
-    
-    except requests.exceptions.RequestException as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-
-
-def reject_suggestion(api_url: str, suggestion_id: int):
-    """Reject a suggestion"""
-    url = f"{api_url}/api/suggestions/{suggestion_id}/reject"
-    
-    try:
-        response = requests.post(url)
-        response.raise_for_status()
-        result = response.json()
-        print(f"✓ {result.get('message', 'Suggestion rejected')}")
-    
-    except requests.exceptions.RequestException as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-
-
 def show_finding(api_url: str, finding_id: int, format: str):
     """Show detailed finding by ID"""
     url = f"{api_url}/api/findings/{finding_id}"
@@ -264,53 +164,6 @@ def show_finding(api_url: str, finding_id: int, format: str):
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 404:
             print(f"Error: Finding ID {finding_id} not found", file=sys.stderr)
-        else:
-            print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-
-
-def show_suggestion(api_url: str, suggestion_id: int, format: str):
-    """Show detailed suggestion by ID"""
-    url = f"{api_url}/api/suggestions/{suggestion_id}"
-    
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        suggestion = response.json()
-        
-        if format == "json":
-            print(json.dumps(suggestion, indent=2))
-        else:
-            # Format timestamps
-            try:
-                created_at = datetime.fromtimestamp(suggestion.get("created_at", 0)).strftime("%Y-%m-%d %H:%M:%S")
-            except:
-                created_at = str(suggestion.get("created_at", "N/A"))
-            
-            try:
-                updated_at = datetime.fromtimestamp(suggestion.get("updated_at", 0)).strftime("%Y-%m-%d %H:%M:%S")
-            except:
-                updated_at = str(suggestion.get("updated_at", "N/A"))
-            
-            print("=" * 60)
-            print(f"Suggestion ID: {suggestion.get('id')}")
-            print("=" * 60)
-            print(f"Finding ID:  {suggestion.get('finding_id')}")
-            print(f"Status:      {suggestion.get('status', 'pending')}")
-            print(f"Created:     {created_at}")
-            print(f"Updated:     {updated_at}")
-            print(f"\n{'='*60}")
-            print("Suggestion Text:")
-            print(f"{'='*60}")
-            print(suggestion.get("suggestion_text", "N/A"))
-            print(f"{'='*60}")
-    
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 404:
-            print(f"Error: Suggestion ID {suggestion_id} not found", file=sys.stderr)
         else:
             print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -456,24 +309,26 @@ def get_stats(api_url: str):
         services_response.raise_for_status()
         services = services_response.json()
         
-        # Get suggestions
-        suggestions_response = requests.get(f"{api_url}/api/suggestions")
-        suggestions_response.raise_for_status()
-        suggestions = suggestions_response.json()
+        # Get remediation runs
+        remediation_response = requests.get(f"{api_url}/api/remediation")
+        remediation_response.raise_for_status()
+        remediations = remediation_response.json()
         
         # Calculate stats
         total_findings = len(findings)
         high_severity = len([f for f in findings if f.get("severity") == "HIGH"])
-        pending_suggestions = len([s for s in suggestions if s.get("status") == "pending"])
+        resolved = len([f for f in findings if f.get("status") == "resolved"])
         total_services = len(services)
+        total_remediations = len(remediations)
         
         print("=" * 40)
         print("SecOps Statistics")
         print("=" * 40)
         print(f"Total Findings:      {total_findings}")
         print(f"High Severity:       {high_severity}")
-        print(f"Pending Suggestions: {pending_suggestions}")
+        print(f"Resolved:            {resolved}")
         print(f"Services Scanned:    {total_services}")
+        print(f"Remediation Runs:    {total_remediations}")
         print("=" * 40)
         
     except requests.exceptions.RequestException as e:
@@ -502,11 +357,11 @@ Examples:
   # Trigger scan
   %(prog)s scan
   
-  # Generate suggestion for finding ID 123
-  %(prog)s suggestions generate 123
+  # Remediate a finding
+  %(prog)s remediate run 123
   
-  # Show suggestion details by ID
-  %(prog)s suggestions show 456
+  # Force remediate without approval
+  %(prog)s remediate run 123 --force
   
   # Get statistics
   %(prog)s stats
@@ -540,26 +395,6 @@ Examples:
     
     # Scan commands
     subparsers.add_parser("scan", help="Trigger manual scan")
-    
-    # Suggestions commands
-    suggestions_parser = subparsers.add_parser("suggestions", help="Suggestions operations")
-    suggestions_subparsers = suggestions_parser.add_subparsers(dest="suggestions_action")
-    
-    list_sugg_parser = suggestions_subparsers.add_parser("list", help="List suggestions")
-    list_sugg_parser.add_argument("--finding-id", type=int, dest="finding_id", help="Filter by finding ID")
-    list_sugg_parser.add_argument("--status", choices=["pending", "approved", "rejected"], help="Filter by status")
-    
-    generate_parser = suggestions_subparsers.add_parser("generate", help="Generate suggestion")
-    generate_parser.add_argument("finding_id", type=int, help="Finding ID")
-    
-    show_suggestion_parser = suggestions_subparsers.add_parser("show", help="Show suggestion details")
-    show_suggestion_parser.add_argument("suggestion_id", type=int, help="Suggestion ID")
-    
-    approve_parser = suggestions_subparsers.add_parser("approve", help="Approve suggestion")
-    approve_parser.add_argument("suggestion_id", type=int, help="Suggestion ID")
-    
-    reject_parser = suggestions_subparsers.add_parser("reject", help="Reject suggestion")
-    reject_parser.add_argument("suggestion_id", type=int, help="Suggestion ID")
     
     # Remediation commands
     remediation_parser = subparsers.add_parser("remediate", help="Remediation operations")
@@ -597,22 +432,6 @@ Examples:
         list_services(args.api_url, args.format)
     elif args.command == "scan":
         trigger_scan(args.api_url)
-    elif args.command == "suggestions":
-        if args.suggestions_action == "generate":
-            generate_suggestion(args.api_url, args.finding_id, args.format)
-        elif args.suggestions_action == "list":
-            finding_id = getattr(args, 'finding_id', None)
-            status = getattr(args, 'status', None)
-            list_suggestions(args.api_url, finding_id, status, args.format)
-        elif args.suggestions_action == "show":
-            show_suggestion(args.api_url, args.suggestion_id, args.format)
-        elif args.suggestions_action == "approve":
-            approve_suggestion(args.api_url, args.suggestion_id)
-        elif args.suggestions_action == "reject":
-            reject_suggestion(args.api_url, args.suggestion_id)
-        else:
-            parser.print_help()
-            sys.exit(1)
     elif args.command == "remediate":
         if args.remediation_action == "run":
             remediate_finding(args.api_url, args.finding_id, args.force, args.format)
@@ -633,4 +452,3 @@ Examples:
 
 if __name__ == "__main__":
     main()
-

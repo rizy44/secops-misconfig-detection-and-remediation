@@ -9,7 +9,6 @@ services:
       - SECOPS_DB=/data/secops/findings.db
       - SCAN_INTERVAL_SEC=300
       - SECOPS_LOG=/data/secops/secops.log
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ADMIN_CIDR=${ADMIN_CIDR:-172.10.0.200/32}
       - ANSIBLE_INVENTORY=${ANSIBLE_INVENTORY:-/data/secops/inventory.ini}
     volumes:
@@ -18,4 +17,3 @@ services:
     ports:
       - "8000:8000"
     restart: unless-stopped
-
