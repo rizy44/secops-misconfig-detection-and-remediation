@@ -1,0 +1,91 @@
+- hosts: "secops_app:obs_stack:private_vm:gateway"
+  become: true
+  vars:
+    loki_host: "{{ hostvars[groups['obs_stack'][0]].private_ip | default(hostvars[groups['obs_stack'][0]].ansible_host) }}"
+    loki_push_url: "http://{{ loki_host }}:3100/loki/api/v1/push"
+  tasks:
+    - name: Create agents dir
+      file:
+        path: /opt/agents
+        state: directory
+
+    - name: Write promtail config (inventory-driven Loki URL)
+      copy:
+        dest: /opt/agents/promtail-config.yml
+        content: |
+          server:
+            http_listen_port: 9080
+            grpc_listen_port: 0
+
+          positions:
+            filename: /tmp/positions.yaml
+
+          clients:
+            - url: {{ loki_push_url }}
+
+          scrape_configs:
+            - job_name: syslog
+              static_configs:
+                - targets: [localhost]
+                  labels:
+                    job: syslog
+                    host: {{ inventory_hostname }}
+                    __path__: /var/log/syslog
+
+            - job_name: authlog
+              static_configs:
+                - targets: [localhost]
+                  labels:
+                    job: auth
+                    host: {{ inventory_hostname }}
+                    __path__: /var/log/auth.log
+
+            - job_name: nginx
+              static_configs:
+                - targets: [localhost]
+                  labels:
+                    job: nginx
+                    host: {{ inventory_hostname }}
+                    __path__: /var/log/nginx/*.log
+
+            - job_name: secops
+              static_configs:
+                - targets: [localhost]
+                  labels:
+                    job: secops
+                    host: {{ inventory_hostname }}
+                    __path__: /data/secops/secops.log
+
+
+    - name: Write docker-compose for node_exporter + promtail
+      copy:
+        dest: /opt/agents/docker-compose.yml
+        content: |
+          services:
+            node_exporter:
+              image: prom/node-exporter:latest
+              container_name: node_exporter
+              restart: unless-stopped
+              network_mode: host
+              pid: host
+              command:
+                - "--path.rootfs=/host"
+              volumes:
+                - "/:/host:ro,rslave"
+
+            promtail:
+              image: grafana/promtail:latest
+              container_name: promtail
+              restart: unless-stopped
+              command: ["-config.file=/etc/promtail/config.yml"]
+              volumes:
+                - "/var/log:/var/log:ro"
+                - "/data:/data:ro"
+                - "/opt/agents/promtail-config.yml:/etc/promtail/config.yml:ro"
+
+    - name: Start agents
+      shell: |
+        cd /opt/agents
+        docker compose up -d
+      args:
+        executable: /bin/bash

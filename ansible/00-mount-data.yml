@@ -1,0 +1,11 @@
+- hosts: all
+  become: true
+  vars:
+    data_mount: "/data"
+  
+  tasks:
+    - name: Ensure /data directory exists (on root disk)
+      file:
+        path: "{{ data_mount }}"
+        state: directory
+        mode: "0755"

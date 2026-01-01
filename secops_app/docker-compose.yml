@@ -1,0 +1,21 @@
+services:
+  secops_api:
+    image: python:3.11-slim
+    working_dir: /app
+    entrypoint: ["/bin/bash", "/app/entrypoint.sh"]
+    env_file:
+      - ./openstack.env
+    environment:
+      - SECOPS_DB=/data/secops/findings.db
+      - SCAN_INTERVAL_SEC=300
+      - SECOPS_LOG=/data/secops/secops.log
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ADMIN_CIDR=${ADMIN_CIDR:-172.10.0.200/32}
+      - ANSIBLE_INVENTORY=${ANSIBLE_INVENTORY:-/data/secops/inventory.ini}
+    volumes:
+      - ./:/app:ro
+      - /data:/data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+

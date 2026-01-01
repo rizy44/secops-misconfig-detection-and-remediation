@@ -1,0 +1,60 @@
+# Remediation Runbook Catalog
+# Maps canonical finding types to runbook IDs with execution parameters
+
+rb_sg_restrict_ssh:
+  finding_types:
+    - SG_WORLD_OPEN_SSH
+  aliases:
+    - SG_OPEN_SSH
+  approval_required: true
+  params:
+    admin_cidr: "${ADMIN_CIDR}"
+  verify:
+    - "recheck security group rules: no 0.0.0.0/0 tcp/22, has admin_cidr tcp/22"
+
+rb_sg_restrict_rdp:
+  finding_types:
+    - SG_WORLD_OPEN_RDP
+  aliases:
+    - SG_OPEN_RDP
+  approval_required: true
+  params:
+    admin_cidr: "${ADMIN_CIDR}"
+  verify:
+    - "recheck security group rules: no 0.0.0.0/0 tcp/3389, has admin_cidr tcp/3389"
+
+rb_sg_restrict_db:
+  finding_types:
+    - SG_WORLD_OPEN_DB_PORT
+  approval_required: true
+  params:
+    admin_cidr: "${ADMIN_CIDR}"
+  verify:
+    - "recheck security group rules: no 0.0.0.0/0 on database ports"
+
+rb_detach_floating_ip:
+  finding_types:
+    - FIP_EXPOSED_INSTANCE
+  approval_required: true
+  params: {}
+  verify:
+    - "recheck server: no floating ip attached"
+
+rb_enable_port_security:
+  finding_types:
+    - PORT_SECURITY_DISABLED
+  approval_required: true
+  params: {}
+  verify:
+    - "recheck port_security_enabled == True"
+
+rb_os_harden_ssh:
+  finding_types:
+    - OS_SSH_PASSWORD_AUTH_ENABLED
+    - OS_SSH_ROOT_LOGIN_ENABLED
+  approval_required: true
+  params:
+    ansible_inventory: "${ANSIBLE_INVENTORY}"
+  verify:
+    - "recheck sshd_config values and ssh service ok"
+

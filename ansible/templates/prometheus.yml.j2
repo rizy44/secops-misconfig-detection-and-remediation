@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "node_exporters"
+    static_configs:
+      - targets:
+{% for h in groups['all'] %}
+{% if hostvars[h].private_ip is defined %}
+          - "{{ hostvars[h].private_ip }}:9100"
+{% endif %}
+{% endfor %}
+
+  - job_name: "secops_api"
+    static_configs:
+      - targets:
+          - "{{ hostvars[groups['secops_app'][0]].private_ip | default(hostvars[groups['secops_app'][0]].ansible_host) }}:8000"
+
