@@ -1,0 +1,18 @@
+# Git attributes for SecOps project
+
+# Mark example files as linguist-documentation to exclude from language stats
+*.example linguist-documentation
+
+# Ensure proper line endings
+*.sh text eol=lf
+*.py text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.tf text eol=lf
+*.md text eol=lf
+
+# Binary files
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+
