@@ -282,17 +282,41 @@ terraform init
 
 # Review the deployment plan
 terraform plan
+```
 
-# (Recommended) Pre-deploy scan (report-only by default)
-# Windows (PowerShell):
-#   powershell -ExecutionPolicy Bypass -File scripts/predeploy_scan.ps1 -Mode report
-# To hard-block deploy on findings:
-#   powershell -ExecutionPolicy Bypass -File scripts/predeploy_scan.ps1 -Mode enforce
-#
-# CI hard-block toggle (GitHub Actions):
-#   Set repo variable ENFORCE_SECURITY_GATES=true
+#### (Recommended) Pre-deploy scan (before `terraform apply`)
 
-# Deploy infrastructure
+This repo intentionally includes insecure IaC examples (e.g., `0.0.0.0/0` SSH/RDP) for demo/testing, so the scan supports **report** vs **enforce** mode.
+
+Windows (PowerShell), from repo root:
+
+```powershell
+# Report-only (recommended for demo repos)
+powershell -ExecutionPolicy Bypass -File scripts/predeploy_scan.ps1 -Mode report
+
+# Enforce (blocks deploy on findings)
+powershell -ExecutionPolicy Bypass -File scripts/predeploy_scan.ps1 -Mode enforce
+```
+
+CI hard-block toggle (GitHub Actions):
+- Set repo variable `ENFORCE_SECURITY_GATES=true`
+
+#### Deployment workflow (with pre-scan)
+
+```mermaid
+graph TD
+  A[Change IaC: Terraform/Ansible/YAML] --> B[Pre-deploy scan<br/>yamllint + checkov + trivy config + ansible-lint]
+  B -->|Pass or report-only| C[Terraform apply]
+  C --> D[Ansible playbooks]
+  D --> E[Platform running]
+  E --> F[Post-deploy SecOps scan<br/>secops-cli scan / scheduler]
+  F --> G[Findings]
+  G --> H[Remediation + verify]
+```
+
+Back in `terraform/`, deploy infrastructure:
+
+```bash
 terraform apply
 ```
 
@@ -363,7 +387,7 @@ curl http://localhost:8000/api/services      # List services
 curl -X POST http://localhost:8000/api/scan  # Trigger scan
 ```
 
-### Typical Workflow
+### Typical Workflow (post-deploy SecOps scanning)
 
 ```mermaid
 graph LR
