@@ -296,6 +296,14 @@ powershell -ExecutionPolicy Bypass -File scripts/predeploy_scan.ps1 -Mode report
 
 # Enforce (blocks deploy on findings)
 powershell -ExecutionPolicy Bypass -File scripts/predeploy_scan.ps1 -Mode enforce
+
+# Auto-fix (best effort) + scan
+powershell -ExecutionPolicy Bypass -File scripts/predeploy_scan.ps1 -Mode report -Fix
+
+# IaC remediation runbook (best effort) + scan:
+# - Will try to run an Ansible runbook via Docker
+# - If Docker Linux engine is not available, it will fallback to a local PowerShell edit
+powershell -ExecutionPolicy Bypass -File scripts/predeploy_scan.ps1 -Mode report -RemediateIac
 ```
 
 CI hard-block toggle (GitHub Actions):

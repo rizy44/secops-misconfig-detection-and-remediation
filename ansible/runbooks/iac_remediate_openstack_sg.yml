@@ -1,0 +1,60 @@
+---
+- name: IaC remediation - OpenStack SG rules (Terraform)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    # secure  : replace 0.0.0.0/0 with var.admin_cidr (recommended)
+    # insecure: restore demo misconfig (0.0.0.0/0)
+    iac_mode: secure
+    tf_file: terraform/main.tf
+    admin_cidr_expr: var.admin_cidr
+
+  tasks:
+    - name: Validate iac_mode
+      ansible.builtin.assert:
+        that:
+          - iac_mode in ["secure", "insecure"]
+        fail_msg: "iac_mode must be 'secure' or 'insecure'"
+
+    - name: Ensure Terraform file exists
+      ansible.builtin.stat:
+        path: "{{ tf_file }}"
+      register: tf_stat
+
+    - name: Fail if Terraform file not found
+      ansible.builtin.fail:
+        msg: "Terraform file not found: {{ tf_file }}"
+      when: not tf_stat.stat.exists
+
+    - name: Set desired remote_ip_prefix line
+      ansible.builtin.set_fact:
+        desired_remote_ip_prefix_line: >-
+          {{ 'remote_ip_prefix  = "' ~ '0.0.0.0/0' ~ '"' if iac_mode == 'insecure' else 'remote_ip_prefix  = ' ~ admin_cidr_expr }}
+
+    - name: Fix SG SSH rule (sg_private_vm_ssh_world)
+      ansible.builtin.replace:
+        path: "{{ tf_file }}"
+        after: '^resource "openstack_networking_secgroup_rule_v2" "sg_private_vm_ssh_world" \\{$'
+        before: '^resource "openstack_networking_secgroup_rule_v2" "sg_private_vm_rdp_world" \\{$'
+        regexp: '^\\s*remote_ip_prefix\\s*=\\s*.*$'
+        replace: "  {{ desired_remote_ip_prefix_line }}"
+
+    - name: Fix SG RDP rule (sg_private_vm_rdp_world)
+      ansible.builtin.replace:
+        path: "{{ tf_file }}"
+        after: '^resource "openstack_networking_secgroup_rule_v2" "sg_private_vm_rdp_world" \\{$'
+        before: '^resource "openstack_networking_secgroup_rule_v2" "sg_private_vm_mysql_world" \\{$'
+        regexp: '^\\s*remote_ip_prefix\\s*=\\s*.*$'
+        replace: "  {{ desired_remote_ip_prefix_line }}"
+
+    - name: Fix SG MySQL rule (sg_private_vm_mysql_world)
+      ansible.builtin.replace:
+        path: "{{ tf_file }}"
+        after: '^resource "openstack_networking_secgroup_rule_v2" "sg_private_vm_mysql_world" \\{$'
+        before: '^# ============================================================================\\s*$'
+        regexp: '^\\s*remote_ip_prefix\\s*=\\s*.*$'
+        replace: "  {{ desired_remote_ip_prefix_line }}"
+
+

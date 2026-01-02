@@ -224,7 +224,7 @@ resource "openstack_networking_secgroup_rule_v2" "sg_private_vm_ssh_world" {
   protocol          = "tcp"
   port_range_min    = 22
   port_range_max    = 22
-  remote_ip_prefix  = "${var.admin_cidr}"
+  remote_ip_prefix  = var.admin_cidr
   security_group_id = openstack_networking_secgroup_v2.sg_private_vm_test.id
   description       = "Intentionally insecure: SSH open to world for testing"
 }
@@ -236,7 +236,7 @@ resource "openstack_networking_secgroup_rule_v2" "sg_private_vm_rdp_world" {
   protocol          = "tcp"
   port_range_min    = 3389
   port_range_max    = 3389
-  remote_ip_prefix  = "${var.admin_cidr}"
+  remote_ip_prefix  = var.admin_cidr
   security_group_id = openstack_networking_secgroup_v2.sg_private_vm_test.id
   description       = "Intentionally insecure: RDP open to world for testing"
 }
@@ -248,7 +248,7 @@ resource "openstack_networking_secgroup_rule_v2" "sg_private_vm_mysql_world" {
   protocol          = "tcp"
   port_range_min    = 3306
   port_range_max    = 3306
-  remote_ip_prefix  = "${var.admin_cidr}"
+  remote_ip_prefix  = var.admin_cidr
   security_group_id = openstack_networking_secgroup_v2.sg_private_vm_test.id
   description       = "Intentionally insecure: MySQL open to world for testing"
 }
@@ -323,18 +323,18 @@ resource "openstack_networking_port_v2" "port_gateway_private" {
   depends_on = [openstack_networking_subnet_v2.a_subnet_private]
 }
 
-# Port với port_security_enabled = true (để test PORT_SECURITY_DISABLED)
-# Lưu ý: Khi port_security_enabled = true, không thể dùng security groups
+# Port với port_security_enabled = false (để test PORT_SECURITY_DISABLED)
+# Lưu ý: Khi port_security_enabled = false, không thể dùng security groups
 resource "openstack_networking_port_v2" "port_private_vm" {
   name                 = "${var.name_prefix}-port-private-vm"
   network_id           = openstack_networking_network_v2.a_private_net.id
-  port_security_enabled = true  # Misconfiguration để test
+  port_security_enabled = false  # Misconfiguration để test
 
   fixed_ip {
     subnet_id = openstack_networking_subnet_v2.a_subnet_private.id
   }
 
-  # Không thể dùng security_group_ids khi port_security_enabled = true
+  # Không thể dùng security_group_ids khi port_security_enabled = false
   # Security groups sẽ được apply ở instance level nếu cần
 
   depends_on = [openstack_networking_subnet_v2.a_subnet_private]
