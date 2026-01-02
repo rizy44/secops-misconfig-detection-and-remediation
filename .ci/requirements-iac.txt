@@ -1,0 +1,6 @@
+# CI/dev requirements for IaC linting & misconfiguration scanning
+# Use minimum versions to keep things reasonably stable across environments.
+yamllint>=1.35.1
+checkov>=3.2.0
+
+

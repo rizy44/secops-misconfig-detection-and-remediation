@@ -1,0 +1,24 @@
+extends: default
+
+# Keep yamllint useful (formatting + obvious issues) but not overly strict for Ansible/playbooks.
+rules:
+  document-start: disable
+  truthy: disable
+  new-lines: disable
+  line-length:
+    max: 200
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
+  trailing-spaces:
+    level: warning
+  empty-lines:
+    max: 2
+    max-start: 0
+    max-end: 2
+
+ignore: |
+  **/.terraform/**
+  **/node_modules/**
+  **/vendor/**
+
+

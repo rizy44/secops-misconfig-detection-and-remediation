@@ -1,0 +1,115 @@
+name: predeploy-scan
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      ENFORCE_SECURITY_GATES: ${{ vars.ENFORCE_SECURITY_GATES }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install linters
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r .ci/requirements-iac.txt ansible-lint
+
+      - name: yamllint
+        run: yamllint -f parsable .
+
+      - name: ansible-lint (report-only unless ENFORCE_SECURITY_GATES=true)
+        shell: bash
+        run: |
+          set +e
+          ansible-lint ansible/*.yml -p
+          rc=$?
+          if [ "${ENFORCE_SECURITY_GATES:-false}" = "true" ]; then
+            exit $rc
+          fi
+          exit 0
+
+  iac-sast:
+    runs-on: ubuntu-latest
+    env:
+      ENFORCE_SECURITY_GATES: ${{ vars.ENFORCE_SECURITY_GATES }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Checkov
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r .ci/requirements-iac.txt
+
+      - name: Checkov (Terraform) -> SARIF (report-only unless ENFORCE_SECURITY_GATES=true)
+        shell: bash
+        run: |
+          mkdir -p reports
+          set +e
+          checkov -d terraform --quiet --output sarif --output-file-path reports
+          rc=$?
+          if [ "${ENFORCE_SECURITY_GATES:-false}" = "true" ]; then
+            exit $rc
+          fi
+          exit 0
+
+      - name: Upload Checkov SARIF to Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: reports/results_sarif.sarif
+
+      - name: Trivy config scan -> SARIF (report-only unless ENFORCE_SECURITY_GATES=true)
+        uses: aquasecurity/trivy-action@0.22.0
+        continue-on-error: ${{ vars.ENFORCE_SECURITY_GATES != 'true' }}
+        with:
+          scan-type: "config"
+          scan-ref: "."
+          severity: "HIGH,CRITICAL"
+          format: "sarif"
+          output: "reports/trivy-config.sarif"
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: KICS scan -> SARIF (report-only unless ENFORCE_SECURITY_GATES=true)
+        uses: checkmarx/kics-github-action@v2.1.5
+        continue-on-error: ${{ vars.ENFORCE_SECURITY_GATES != 'true' }}
+        with:
+          path: "."
+          output_path: "reports"
+          output_formats: "sarif"
+          fail_on: "high,critical"
+
+      - name: Upload Trivy SARIF to Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: reports/trivy-config.sarif
+
+      - name: Upload KICS SARIF to Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: reports/results.sarif
+
+      - name: Upload reports artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: predeploy-scan-reports
+          path: reports/
+
+

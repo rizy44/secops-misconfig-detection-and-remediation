@@ -283,6 +283,15 @@ terraform init
 # Review the deployment plan
 terraform plan
 
+# (Recommended) Pre-deploy scan (report-only by default)
+# Windows (PowerShell):
+#   powershell -ExecutionPolicy Bypass -File scripts/predeploy_scan.ps1 -Mode report
+# To hard-block deploy on findings:
+#   powershell -ExecutionPolicy Bypass -File scripts/predeploy_scan.ps1 -Mode enforce
+#
+# CI hard-block toggle (GitHub Actions):
+#   Set repo variable ENFORCE_SECURITY_GATES=true
+
 # Deploy infrastructure
 terraform apply
 ```

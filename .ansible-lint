@@ -1,0 +1,11 @@
+# Minimal ansible-lint config.
+# We keep this intentionally light because this repo is a demo platform and
+# some playbooks/templates may trade strict style for clarity.
+profile: basic
+
+exclude_paths:
+  - ansible/inventory.ini
+  - ansible/inventory.ini.example
+  - terraform/.terraform
+
+
