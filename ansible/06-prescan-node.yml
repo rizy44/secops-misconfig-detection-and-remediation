@@ -1,0 +1,229 @@
+---
+# Ansible Playbook: Deploy Pre-Scan Node
+# =======================================
+# This playbook deploys the Pre-Scan Node service on the target VM.
+#
+# Usage:
+#   ansible-playbook -i inventory.ini 06-prescan-node.yml
+#
+# Requirements:
+#   - Target VM must have Docker installed
+#   - SSH access configured
+
+- name: Deploy Pre-Scan Node
+  hosts: prescan_node
+  become: yes
+  vars:
+    prescan_app_dir: /opt/prescan-node
+    prescan_data_dir: /data/prescan
+    deploy_input_dir: /deploy/in
+    deploy_output_dir: /deploy/out
+    prescan_api_port: 8001
+    admin_cidr: "{{ lookup('env', 'ADMIN_CIDR') | default('10.0.0.0/8', true) }}"
+    internal_cidr: "{{ lookup('env', 'INTERNAL_CIDR') | default('10.10.50.0/24', true) }}"
+    secops_app_ip: "{{ hostvars['secops_app']['ansible_host'] | default('10.10.50.163') }}"
+
+  tasks:
+    # ========================================
+    # Pre-requisites
+    # ========================================
+    
+    - name: Ensure Docker is installed and running
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add ubuntu user to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    # ========================================
+    # Directory Setup
+    # ========================================
+    
+    - name: Create application directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: ubuntu
+        group: ubuntu
+      loop:
+        - "{{ prescan_app_dir }}"
+        - "{{ prescan_app_dir }}/config"
+        - "{{ prescan_app_dir }}/runbooks"
+        - "{{ prescan_app_dir }}/services"
+        - "{{ prescan_data_dir }}"
+        - "{{ deploy_input_dir }}"
+        - "{{ deploy_output_dir }}"
+        - /var/log/prescan
+
+    # ========================================
+    # Copy Application Files
+    # ========================================
+    
+    - name: Copy Pre-Scan Node application files
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ prescan_app_dir }}/{{ item.dest }}"
+        mode: "{{ item.mode | default('0644') }}"
+        owner: ubuntu
+        group: ubuntu
+      loop:
+        - { src: "../prescan_node/main.py", dest: "main.py" }
+        - { src: "../prescan_node/requirements.txt", dest: "requirements.txt" }
+        - { src: "../prescan_node/Dockerfile", dest: "Dockerfile" }
+        - { src: "../prescan_node/docker-compose.yml", dest: "docker-compose.yml" }
+
+    - name: Copy services directory
+      copy:
+        src: "../prescan_node/services/"
+        dest: "{{ prescan_app_dir }}/services/"
+        mode: '0644'
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Copy configuration files
+      copy:
+        src: "../prescan_node/config/"
+        dest: "{{ prescan_app_dir }}/config/"
+        mode: '0644'
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Copy runbooks
+      copy:
+        src: "../prescan_node/runbooks/"
+        dest: "{{ prescan_app_dir }}/runbooks/"
+        mode: '0644'
+        owner: ubuntu
+        group: ubuntu
+
+    # ========================================
+    # Environment Configuration
+    # ========================================
+    
+    - name: Create environment file
+      template:
+        src: templates/prescan_env.j2
+        dest: "{{ prescan_app_dir }}/.env"
+        mode: '0600'
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Update Pre-Scan configuration
+      template:
+        src: templates/prescan_config.yml.j2
+        dest: "{{ prescan_app_dir }}/config/prescan_config.yml"
+        mode: '0644'
+        owner: ubuntu
+        group: ubuntu
+
+    # ========================================
+    # SSH Keys for Ansible Deployment
+    # ========================================
+    
+    - name: Create .ssh directory
+      file:
+        path: /root/.ssh
+        state: directory
+        mode: '0700'
+
+    - name: Copy SSH private key for Ansible deployments
+      copy:
+        src: "{{ ssh_private_key_path | default('~/.ssh/id_rsa') }}"
+        dest: /root/.ssh/id_rsa
+        mode: '0600'
+      when: ssh_private_key_path is defined
+
+    # ========================================
+    # Build and Deploy
+    # ========================================
+    
+    - name: Build Pre-Scan Node Docker image
+      docker_image:
+        name: prescan-node
+        tag: latest
+        source: build
+        build:
+          path: "{{ prescan_app_dir }}"
+          pull: yes
+        force_source: yes
+
+    - name: Start Pre-Scan Node containers
+      docker_compose:
+        project_src: "{{ prescan_app_dir }}"
+        state: present
+        pull: no
+        build: no
+      register: compose_result
+
+    - name: Display container status
+      debug:
+        var: compose_result
+
+    # ========================================
+    # Verification
+    # ========================================
+    
+    - name: Wait for Pre-Scan Node API to be ready
+      uri:
+        url: "http://localhost:{{ prescan_api_port }}/api/health"
+        method: GET
+        status_code: 200
+      register: health_check
+      until: health_check.status == 200
+      retries: 12
+      delay: 5
+
+    - name: Get Pre-Scan Node status
+      uri:
+        url: "http://localhost:{{ prescan_api_port }}/api/status"
+        method: GET
+        return_content: yes
+      register: status_response
+
+    - name: Display Pre-Scan Node status
+      debug:
+        var: status_response.json
+
+    # ========================================
+    # Systemd Service (Optional)
+    # ========================================
+    
+    - name: Create systemd service file
+      copy:
+        content: |
+          [Unit]
+          Description=Pre-Scan Node Service
+          After=docker.service
+          Requires=docker.service
+
+          [Service]
+          Type=simple
+          WorkingDirectory={{ prescan_app_dir }}
+          ExecStart=/usr/bin/docker-compose up
+          ExecStop=/usr/bin/docker-compose down
+          Restart=always
+          RestartSec=10
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/prescan-node.service
+        mode: '0644'
+
+    - name: Enable Pre-Scan Node service
+      systemd:
+        name: prescan-node
+        daemon_reload: yes
+        enabled: yes
+
+  handlers:
+    - name: Restart Pre-Scan Node
+      docker_compose:
+        project_src: "{{ prescan_app_dir }}"
+        state: present
+        restarted: yes

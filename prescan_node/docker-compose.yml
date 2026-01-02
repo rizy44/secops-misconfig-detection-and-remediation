@@ -1,0 +1,68 @@
+version: "3.8"
+
+services:
+  prescan-node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: prescan-node
+    hostname: prescan-node
+    restart: unless-stopped
+
+    ports:
+      - "8001:8001"
+
+    volumes:
+      # Configuration
+      - ./config:/app/config:ro
+      - ./runbooks:/app/runbooks:ro
+
+      # Deploy directories
+      - prescan_input:/deploy/in
+      - prescan_output:/deploy/out
+
+      # Data persistence
+      - prescan_data:/data/prescan
+      - prescan_logs:/var/log/prescan
+
+      # Docker socket (for trivy scanning)
+      - /var/run/docker.sock:/var/run/docker.sock
+
+      # SSH keys (for Ansible)
+      - ${SSH_PRIVATE_KEY_PATH:-~/.ssh/id_rsa}:/root/.ssh/id_rsa:ro
+
+      # OpenStack credentials
+      - ${CLOUDS_YAML_PATH:-~/.config/openstack/clouds.yaml}:/root/.config/openstack/clouds.yaml:ro
+
+    environment:
+      - PRESCAN_CONFIG=/app/config/prescan_config.yml
+      - ADMIN_CIDR=${ADMIN_CIDR:-10.0.0.0/8}
+      - INTERNAL_CIDR=${INTERNAL_CIDR:-10.10.50.0/24}
+      - SECOPS_API_URL=${SECOPS_API_URL:-http://secops-app:8000}
+      - WEBHOOK_URL=${WEBHOOK_URL:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+    networks:
+      - secops-network
+
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8001/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  prescan_input:
+    driver: local
+  prescan_output:
+    driver: local
+  prescan_data:
+    driver: local
+  prescan_logs:
+    driver: local
+
+networks:
+  secops-network:
+    external: true
+    name: secops_default

@@ -1,0 +1,68 @@
+#cloud-config
+# Cloud-init configuration for Pre-Scan Node
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - docker.io
+  - docker-compose
+  - python3-pip
+  - git
+  - curl
+  - unzip
+
+write_files:
+  - path: /etc/systemd/system/prescan-node.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Pre-Scan Node Service
+      After=docker.service
+      Requires=docker.service
+
+      [Service]
+      Type=simple
+      WorkingDirectory=/opt/prescan-node
+      ExecStart=/usr/bin/docker-compose up
+      ExecStop=/usr/bin/docker-compose down
+      Restart=always
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /opt/prescan-node/.env
+    permissions: '0600'
+    content: |
+      PRESCAN_IP=${prescan_ip}
+      SECOPS_API_URL=http://${secops_app_ip}:8000
+      ADMIN_CIDR=${admin_cidr}
+      INTERNAL_CIDR=${tenant_cidr}
+      LOG_LEVEL=INFO
+
+runcmd:
+  # Format and mount data volume
+  - mkfs.ext4 /dev/vdb || true
+  - mkdir -p /data
+  - mount /dev/vdb /data
+  - echo '/dev/vdb /data ext4 defaults 0 2' >> /etc/fstab
+
+  # Create directories
+  - mkdir -p /data/prescan
+  - mkdir -p /opt/prescan-node
+  - mkdir -p /deploy/in /deploy/out
+
+  # Add ubuntu user to docker group
+  - usermod -aG docker ubuntu
+
+  # Enable and start docker
+  - systemctl enable docker
+  - systemctl start docker
+
+  # Pull prescan-node image (will be built by Ansible)
+  # - docker pull prescan-node:latest
+
+  # Note: Full deployment will be done via Ansible playbook
+
+final_message: "Pre-Scan Node cloud-init completed after $UPTIME seconds"

@@ -1,0 +1,159 @@
+# Pre-Scan Node Configuration
+# =============================
+
+# General settings
+node:
+  name: prescan-node
+  log_level: INFO
+  log_file: /var/log/prescan/prescan.log
+
+# File Watcher settings
+watcher:
+  # Directory to watch for new deployment files
+  watch_dir: /deploy/in
+  
+  # How often to check for new files (seconds)
+  poll_interval: 5
+  
+  # File patterns to watch
+  patterns:
+    terraform:
+      - "*.tf"
+      - "*.tfvars"
+    ansible:
+      - "*.yml"
+      - "*.yaml"
+      - "playbook*.yml"
+    all:
+      - "**/*.tf"
+      - "**/*.yml"
+      - "**/*.yaml"
+  
+  # Ignore patterns
+  ignore:
+    - ".git/**"
+    - "__pycache__/**"
+    - "*.pyc"
+    - ".terraform/**"
+
+# Scanner settings
+scanners:
+  # Enable/disable specific scanners
+  enabled:
+    - checkov
+    - trivy
+    - ansible-lint
+    - yamllint
+  
+  # Scanner configurations
+  checkov:
+    frameworks:
+      - terraform
+      - ansible
+    severity: 
+      - HIGH
+      - CRITICAL
+    skip_checks: []
+    
+  trivy:
+    severity:
+      - HIGH
+      - CRITICAL
+    exit_code: 1
+    
+  ansible_lint:
+    profile: production
+    strict: false
+    
+  yamllint:
+    config_file: /app/config/.yamllint
+
+# Auto-Fix Engine settings
+auto_fix:
+  # Enable automatic fixing
+  enabled: true
+  
+  # Runbook catalog location
+  runbook_catalog: /app/runbooks/catalog.yml
+  
+  # Maximum fix attempts per finding
+  max_attempts: 3
+  
+  # Require approval for certain fix types
+  require_approval:
+    - security_group_changes
+    - network_changes
+  
+  # Auto-approve safe fixes
+  auto_approve:
+    - yaml_formatting
+    - missing_tags
+    - deprecated_syntax
+
+# Deployment settings
+deploy:
+  # Enable automatic deployment after successful scan/fix
+  enabled: true
+  
+  # Output directory for fixed files
+  output_dir: /deploy/out
+  
+  # Terraform settings
+  terraform:
+    enabled: true
+    auto_apply: false  # Set true for full automation
+    plan_only: true    # Generate plan first
+    backend_config: {}
+    
+  # Ansible settings
+  ansible:
+    enabled: true
+    inventory: /etc/ansible/hosts
+    private_key: /root/.ssh/id_rsa
+    become: true
+    
+  # Post-deploy verification
+  verify:
+    enabled: true
+    timeout: 300  # seconds
+
+# Notification settings
+notifications:
+  enabled: true
+  
+  # Channels
+  channels:
+    webhook:
+      enabled: true
+      url: "${WEBHOOK_URL}"
+    
+    log:
+      enabled: true
+      
+  # Events to notify
+  events:
+    - scan_started
+    - scan_completed
+    - finding_detected
+    - fix_applied
+    - deploy_started
+    - deploy_completed
+    - deploy_failed
+
+# API Server settings
+api:
+  host: 0.0.0.0
+  port: 8001
+  workers: 2
+  
+# Database settings
+database:
+  type: sqlite
+  path: /data/prescan/prescan.db
+
+# Integration with SecOps App
+secops_integration:
+  enabled: true
+  secops_api_url: "http://secops-app:8000"
+  sync_findings: true
+  sync_interval: 60  # seconds

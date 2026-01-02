@@ -1,0 +1,304 @@
+# Pre-Scan Runbook Catalog
+# =========================
+# Maps IaC scan findings to automatic fix actions
+# Each runbook defines how to automatically remediate a specific issue
+
+# ============================================================
+# TERRAFORM SECURITY GROUP FIXES
+# ============================================================
+
+tf_sg_restrict_ssh:
+  name: "Restrict SSH Access"
+  description: "Replace 0.0.0.0/0 SSH access with admin CIDR"
+  
+  finding_patterns:
+    - checkov: "CKV_OPENSTACK_1"  # SSH open to world
+    - trivy: "AVD-OPENSTACK-0001"
+    - regex: 'cidr\s*=\s*"0\.0\.0\.0/0".*port\s*=\s*22'
+  
+  fix:
+    type: regex_replace
+    target_files:
+      - "*.tf"
+    rules:
+      - pattern: |
+          (security_group_rule\s+"\w*ssh\w*"\s*\{[^}]*cidr\s*=\s*)"0\.0\.0\.0/0"
+        replacement: |
+          $1"${var.admin_cidr}"
+        
+  variables_required:
+    - name: admin_cidr
+      default: "10.0.0.0/8"
+      description: "Admin network CIDR for SSH access"
+      
+  verify:
+    - type: regex_not_match
+      pattern: 'cidr\s*=\s*"0\.0\.0\.0/0".*port_range_min\s*=\s*22'
+    - type: checkov_pass
+      check_id: "CKV_OPENSTACK_1"
+      
+  severity: HIGH
+  auto_approve: false
+
+tf_sg_restrict_rdp:
+  name: "Restrict RDP Access"
+  description: "Replace 0.0.0.0/0 RDP access with admin CIDR"
+  
+  finding_patterns:
+    - checkov: "CKV_OPENSTACK_2"
+    - regex: 'cidr\s*=\s*"0\.0\.0\.0/0".*port\s*=\s*3389'
+  
+  fix:
+    type: regex_replace
+    target_files:
+      - "*.tf"
+    rules:
+      - pattern: |
+          (security_group_rule\s+"\w*rdp\w*"\s*\{[^}]*cidr\s*=\s*)"0\.0\.0\.0/0"
+        replacement: |
+          $1"${var.admin_cidr}"
+  
+  variables_required:
+    - name: admin_cidr
+      default: "10.0.0.0/8"
+      
+  severity: HIGH
+  auto_approve: false
+
+tf_sg_restrict_db:
+  name: "Restrict Database Port Access"
+  description: "Replace 0.0.0.0/0 database access with internal CIDR"
+  
+  finding_patterns:
+    - checkov: "CKV_OPENSTACK_3"
+    - regex: 'cidr\s*=\s*"0\.0\.0\.0/0".*port\s*=\s*(3306|5432|1433|27017)'
+  
+  fix:
+    type: regex_replace
+    target_files:
+      - "*.tf"
+    rules:
+      - pattern: |
+          (security_group_rule\s+"\w*db\w*"\s*\{[^}]*cidr\s*=\s*)"0\.0\.0\.0/0"
+        replacement: |
+          $1"${var.internal_cidr}"
+  
+  variables_required:
+    - name: internal_cidr
+      default: "10.10.50.0/24"
+      
+  severity: HIGH
+  auto_approve: false
+
+# ============================================================
+# TERRAFORM RESOURCE TAG FIXES
+# ============================================================
+
+tf_add_required_tags:
+  name: "Add Required Tags"
+  description: "Add missing required tags to resources"
+  
+  finding_patterns:
+    - checkov: "CKV_OPENSTACK_TAGS"
+    - trivy: "AVD-OPENSTACK-TAGS"
+  
+  fix:
+    type: ast_transform
+    target_files:
+      - "*.tf"
+    rules:
+      - target: "openstack_compute_instance_v2"
+        ensure_attributes:
+          metadata:
+            Environment: "${var.environment}"
+            ManagedBy: "terraform"
+            Project: "${var.project_name}"
+  
+  severity: LOW
+  auto_approve: true
+
+# ============================================================
+# ANSIBLE SECURITY FIXES
+# ============================================================
+
+ansible_fix_ssh_config:
+  name: "Fix SSH Configuration"
+  description: "Ensure secure SSH configuration in Ansible"
+  
+  finding_patterns:
+    - ansible-lint: "risky-file-permissions"
+    - regex: "PermitRootLogin\\s+yes"
+  
+  fix:
+    type: yaml_transform
+    target_files:
+      - "*.yml"
+      - "*.yaml"
+    rules:
+      - path: "tasks[*].lineinfile"
+        when:
+          path: "/etc/ssh/sshd_config"
+          regexp: "PermitRootLogin"
+        set:
+          line: "PermitRootLogin no"
+          
+  severity: HIGH
+  auto_approve: false
+
+ansible_fix_file_permissions:
+  name: "Fix File Permissions"
+  description: "Set secure file permissions in Ansible tasks"
+  
+  finding_patterns:
+    - ansible-lint: "risky-file-permissions"
+  
+  fix:
+    type: yaml_transform
+    target_files:
+      - "*.yml"
+    rules:
+      - path: "tasks[*].file"
+        when_missing: "mode"
+        add:
+          mode: "0644"
+      - path: "tasks[*].copy"
+        when_missing: "mode"
+        add:
+          mode: "0644"
+      - path: "tasks[*].template"
+        when_missing: "mode"
+        add:
+          mode: "0644"
+          
+  severity: MEDIUM
+  auto_approve: true
+
+ansible_fix_become_security:
+  name: "Fix Become Security"
+  description: "Ensure secure privilege escalation configuration"
+  
+  finding_patterns:
+    - ansible-lint: "become-user-without-become"
+  
+  fix:
+    type: yaml_transform
+    target_files:
+      - "*.yml"
+    rules:
+      - path: "tasks[*]"
+        when:
+          become_user: "*"
+        ensure:
+          become: true
+          
+  severity: MEDIUM
+  auto_approve: true
+
+# ============================================================
+# YAML FORMATTING FIXES
+# ============================================================
+
+yaml_fix_formatting:
+  name: "Fix YAML Formatting"
+  description: "Fix YAML formatting issues (indentation, trailing spaces)"
+  
+  finding_patterns:
+    - yamllint: "trailing-spaces"
+    - yamllint: "indentation"
+    - yamllint: "line-length"
+  
+  fix:
+    type: yaml_format
+    target_files:
+      - "*.yml"
+      - "*.yaml"
+    rules:
+      - remove_trailing_spaces: true
+      - indent: 2
+      - max_line_length: 120
+      - ensure_final_newline: true
+      
+  severity: LOW
+  auto_approve: true
+
+# ============================================================
+# TERRAFORM STATE & BACKEND FIXES
+# ============================================================
+
+tf_add_backend_config:
+  name: "Add Backend Configuration"
+  description: "Ensure remote backend is configured"
+  
+  finding_patterns:
+    - checkov: "CKV_TF_BACKEND"
+    - regex: "^(?!.*backend\\s)"
+  
+  fix:
+    type: file_inject
+    target_files:
+      - "provider.tf"
+      - "main.tf"
+    rules:
+      - after_pattern: 'terraform\s*\{'
+        inject: |
+          backend "local" {
+            path = "terraform.tfstate"
+          }
+          
+  severity: MEDIUM
+  auto_approve: true
+
+# ============================================================
+# SECURITY HEADER FIXES (Ansible for web servers)
+# ============================================================
+
+ansible_add_security_headers:
+  name: "Add Security Headers"
+  description: "Add security headers to nginx/apache configuration"
+  
+  finding_patterns:
+    - custom: "missing-security-headers"
+  
+  fix:
+    type: yaml_inject
+    target_files:
+      - "*nginx*.yml"
+      - "*apache*.yml"
+    rules:
+      - path: "tasks"
+        inject_task:
+          name: "Add security headers to nginx"
+          blockinfile:
+            path: "/etc/nginx/conf.d/security-headers.conf"
+            create: yes
+            block: |
+              add_header X-Frame-Options "SAMEORIGIN" always;
+              add_header X-Content-Type-Options "nosniff" always;
+              add_header X-XSS-Protection "1; mode=block" always;
+              add_header Strict-Transport-Security "max-age=31536000" always;
+              
+  severity: MEDIUM
+  auto_approve: false
+
+# ============================================================
+# PORT SECURITY FIXES
+# ============================================================
+
+tf_enable_port_security:
+  name: "Enable Port Security"
+  description: "Ensure port security is enabled on network ports"
+  
+  finding_patterns:
+    - checkov: "CKV_OPENSTACK_PORT_SEC"
+    - regex: 'port_security_enabled\s*=\s*false'
+  
+  fix:
+    type: regex_replace
+    target_files:
+      - "*.tf"
+    rules:
+      - pattern: 'port_security_enabled\s*=\s*false'
+        replacement: 'port_security_enabled = true'
+        
+  severity: HIGH
+  auto_approve: false
