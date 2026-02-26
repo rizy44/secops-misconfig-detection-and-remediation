@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/Monitoring-Prometheus-E6522C?style=for-the-badge&logo=prometheus" alt="Prometheus"/>
 </p>
 
-<h1 align="center">🛡️ SecOps Platform</h1>
+<h1 align="center">SecOps Platform</h1>
 
 <p align="center">
   <strong>Security Orchestration, Automation, and Response (SOAR) for OpenStack</strong>
