@@ -537,49 +537,9 @@ terraform destroy
 
 ---
 
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. 🍴 Fork the repository
-2. 🌿 Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. 💻 Make your changes
-4. ✅ Test thoroughly
-5. 📝 Update documentation
-6. 🚀 Submit a pull request
-
-**Guidelines:**
-- No sensitive data in commits
-- Follow existing code style
-- Update documentation for new features
-
----
-
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 👥 Authors & Acknowledgments
-
-**SecOps Team**
-
-Special thanks to:
-- 🌐 OpenStack community
-- 🏗️ Terraform and Ansible communities
-- 📊 Prometheus, Grafana, and Loki projects
-
----
-
-## 📞 Support
-
-For issues and questions:
-
-1. 📖 Check [SETUP.md](SETUP.md) for common setup issues
-2. 🔍 Review [Troubleshooting](#-troubleshooting) section
-3. 🔎 Check existing issues for similar problems
-4. 🆕 Open a new issue on GitHub
 
 ---
 
